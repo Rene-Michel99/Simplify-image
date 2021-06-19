@@ -82,7 +82,7 @@ class Ui_MainWindow(object):
         self.set_functions_btn()
 
         self.path_input_img = ""
-        self.output_obj_img = None
+        self.output_obj_img = []
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -106,15 +106,15 @@ class Ui_MainWindow(object):
         self.output_img.setPixmap(QtGui.QPixmap(""))
         self.progress_bar.setValue(0)
         self.progress_bar.setEnabled(False)
-        self.output_obj_img = None
+        self.output_obj_img = []
 
     def save_img(self):
-        if self.output_obj_img:
+        if len(self.output_obj_img) > 0:
             options = QFileDialog.Options()
             options |= QFileDialog.DontUseNativeDialog
             fileName, _ = QFileDialog.getSaveFileName(self.MainWindow,"QFileDialog.getSaveFileName()", "","Image files (*.jpg *.png)", options=options)
             if fileName:
-                if fileName.find(".png") == -1 or fileName.find(".jpg") == -1 or fileName.find(".jpeg") == -1:
+                if fileName.find(".png") == -1 and fileName.find(".jpg") == -1 and fileName.find(".jpeg") == -1:
                     fileName += ".png"
                 cv.imwrite(fileName,self.output_obj_img)
         else:
@@ -153,8 +153,6 @@ class Ui_MainWindow(object):
         img = cv.cvtColor(img,cv.COLOR_BGR2RGB)
         img = cv.bilateralFilter(img,9,75,75)
         self.progress_bar.setValue(3)
-
-        self.path_input_img = ""
 
         hsv = cv.cvtColor(img,cv.COLOR_RGB2HSV)
         norm_img = normalize(hsv.reshape((-1,3)))
