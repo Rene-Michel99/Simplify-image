@@ -1,6 +1,9 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QInputDialog, QFileDialog, QMessageBox
-
+from sklearn.preprocessing import normalize
+from sklearn.cluster import KMeans
+import numpy as np
+import cv2 as cv
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -60,6 +63,11 @@ class Ui_MainWindow(object):
         self.horizontalLayout_4.addWidget(self.clear_btn)
         self.verticalLayout.addLayout(self.horizontalLayout_4)
         self.verticalLayout_2.addLayout(self.verticalLayout)
+        self.progress_bar = QtWidgets.QProgressBar(self.centralwidget)
+        self.progress_bar.setEnabled(False)
+        self.progress_bar.setProperty("value", 0)
+        self.progress_bar.setObjectName("progress_bar")
+        self.verticalLayout_2.addWidget(self.progress_bar)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 25))
@@ -73,6 +81,7 @@ class Ui_MainWindow(object):
         self.set_functions_btn()
 
         self.path_input_img = ""
+        self.output_obj_img = None
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -81,6 +90,7 @@ class Ui_MainWindow(object):
         self.select_img_btn.clicked.connect(self.get_and_load_img)
         self.start_process_btn.clicked.connect(self.start_process)
         self.clear_btn.clicked.connect(self.clear_imgs_box)
+        self.save_btn.clicked.connect(self.save_img)
 
     def get_and_load_img(self):
         options = QFileDialog.Options()
@@ -93,6 +103,22 @@ class Ui_MainWindow(object):
     def clear_imgs_box(self):
         self.input_img.setPixmap(QtGui.QPixmap(""))
         self.output_img.setPixmap(QtGui.QPixmap(""))
+        self.progress_bar.setValue(0)
+        self.progress_bar.setEnabled(False)
+        self.output_obj_img = None
+
+    def save_img(self):
+        if self.output_obj_img:
+            options = QFileDialog.Options()
+            options |= QFileDialog.DontUseNativeDialog
+            fileName, _ = QFileDialog.getSaveFileName(self.MainWindow,"QFileDialog.getSaveFileName()", "","Image files (*.jpg *.png)", options=options)
+            if fileName:
+                if fileName.find(".png") == -1 or fileName.find(".jpg") == -1 or fileName.find(".jpeg") == -1:
+                    fileName += ".png"
+                cv.imwrite(fileName,self.output_obj_img)
+                self.output_obj_img = None
+        else:
+            self.error_dialog("Imagem não processada!")
 
     def error_dialog(self,error):
         msg = QMessageBox()
@@ -102,12 +128,52 @@ class Ui_MainWindow(object):
         msg.setWindowTitle("Error")
         msg.exec_()
 
+    def gen_output_img(self):
+        n_clusters = self.n_colors_btn.value()
+
+        img = cv.imread(self.path_input_img)
+        img = cv.cvtColor(img,cv.COLOR_BGR2RGB)
+        img = cv.bilateralFilter(img,9,75,75)
+        self.progress_bar.setValue(3)
+
+        self.path_input_img = ""
+
+        hsv = cv.cvtColor(img,cv.COLOR_RGB2HSV)
+        norm_img = normalize(hsv.reshape((-1,3)))
+        self.progress_bar.setValue(5)
+
+        kmeans = KMeans(n_clusters=n_clusters,random_state=2).fit(norm_img)
+        km_out = kmeans.predict(norm_img)
+        self.progress_bar.setValue(10)
+
+        output = km_out.reshape((img.shape[0],img.shape[1]))
+
+        output_2 = output.astype(np.uint8)
+        output_3 = np.zeros(shape=img.shape,dtype=np.uint8)
+        max_bar = output_2.shape[0]
+        self.progress_bar.setValue(15)
+
+        for i,line in enumerate(output_2):
+            for j,color in enumerate(line):
+                if color == 0:
+                    output_3[i][j] = np.array([255,255,255],dtype=np.uint8)
+                elif color == 1:
+                    output_3[i][j] = np.array([0,255,80],dtype=np.uint8)
+                elif color == 2:
+                    output_3[i][j] = np.array([0,0,80],dtype=np.uint8)
+            if i <= max_bar:
+                self.progress_bar.setValue((i//max_bar)*100)
+
+        cv.imwrite("output.png",cv.cvtColor(output_3,cv.COLOR_RGB2BGR))
+        self.output_img.setPixmap(QtGui.QPixmap("output.png"))
+
     def start_process(self):
         if self.path_input_img != "":
-            print("oxe")
+            self.progress_bar.setEnabled(True)
+            self.progress_bar.setValue(0)
+            self.gen_output_img()
         else:
             self.error_dialog("Imagem não foi selecionada!")
-
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
