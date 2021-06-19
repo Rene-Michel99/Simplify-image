@@ -20,6 +20,7 @@ class Ui_MainWindow(object):
         self.buttons_up.addWidget(self.select_img_btn)
         self.n_colors_btn = QtWidgets.QSpinBox(self.centralwidget)
         self.n_colors_btn.setMinimum(1)
+        self.n_colors_btn.setMaximum(10)
         self.n_colors_btn.setProperty("value", 3)
         self.n_colors_btn.setObjectName("n_colors_btn")
         self.buttons_up.addWidget(self.n_colors_btn)
@@ -116,7 +117,6 @@ class Ui_MainWindow(object):
                 if fileName.find(".png") == -1 or fileName.find(".jpg") == -1 or fileName.find(".jpeg") == -1:
                     fileName += ".png"
                 cv.imwrite(fileName,self.output_obj_img)
-                self.output_obj_img = None
         else:
             self.error_dialog("Imagem não processada!")
 
@@ -128,8 +128,26 @@ class Ui_MainWindow(object):
         msg.setWindowTitle("Error")
         msg.exec_()
 
+    def get_colors(self):
+        colors = self.colors_text.text()
+        if colors == "":
+            return [[255,255,255],[0,255,80],[0,0,80],[255,80,0],[80,0,255],[55,0,55],[0,55,55],[0,77,77],[77,77,0],[100,100,100]]
+        else:
+            colors = colors.replace(" ","")
+            colors = colors.split(";")
+            output = []
+            if colors[len(colors)-1] == ";":
+                colors.pop()
+
+            for color in colors:
+                rgb = color.split(",")
+                output.append([int(rgb[0]),int(rgb[1]),int(rgb[2])])
+            return output
+
     def gen_output_img(self):
         n_clusters = self.n_colors_btn.value()
+        _translate = QtCore.QCoreApplication.translate
+        self.MainWindow.setWindowTitle(_translate("MainWindow", "Simplifica Imagem - Processando imagem..."))
 
         img = cv.imread(self.path_input_img)
         img = cv.cvtColor(img,cv.COLOR_BGR2RGB)
@@ -153,19 +171,19 @@ class Ui_MainWindow(object):
         max_bar = output_2.shape[0]
         self.progress_bar.setValue(15)
 
+        colors = self.get_colors()
+
         for i,line in enumerate(output_2):
             for j,color in enumerate(line):
-                if color == 0:
-                    output_3[i][j] = np.array([255,255,255],dtype=np.uint8)
-                elif color == 1:
-                    output_3[i][j] = np.array([0,255,80],dtype=np.uint8)
-                elif color == 2:
-                    output_3[i][j] = np.array([0,0,80],dtype=np.uint8)
+                output_3[i][j] = np.array(colors[color],dtype=np.uint8)
             if i <= max_bar:
                 self.progress_bar.setValue((i//max_bar)*100)
 
-        cv.imwrite("output.png",cv.cvtColor(output_3,cv.COLOR_RGB2BGR))
+        output_3 = cv.cvtColor(output_3,cv.COLOR_RGB2BGR)
+        self.output_obj_img = output_3
+        cv.imwrite("output.png",output_3)
         self.output_img.setPixmap(QtGui.QPixmap("output.png"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Simplifica Imagem"))
 
     def start_process(self):
         if self.path_input_img != "":
